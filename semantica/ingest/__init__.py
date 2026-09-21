@@ -487,6 +487,10 @@ __all__ = [
     "SAPIngestor",
     "SAPODataEntity",
     "SAPODataConnector",
+    # Apache Airflow ingestion
+    "AirflowIngestor",
+    "AirflowData",
+    "AirflowConnector",
     # Databricks ingestion
     "DatabricksIngestor",
     "DatabricksData",

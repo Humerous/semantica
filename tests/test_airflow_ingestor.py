@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests
 
+import semantica.ingest as ingest_package
 from semantica.ingest.airflow_ingestor import (
     AirflowConnector,
     AirflowData,
@@ -28,6 +29,18 @@ def make_response(
 
     response.raise_for_status.return_value = None
     return response
+
+
+def test_airflow_classes_are_public_package_exports():
+    expected = {
+        "AirflowIngestor": AirflowIngestor,
+        "AirflowData": AirflowData,
+        "AirflowConnector": AirflowConnector,
+    }
+
+    for name, expected_class in expected.items():
+        assert name in ingest_package.__all__
+        assert getattr(ingest_package, name) is expected_class
 
 
 class TestAirflowConnector:
@@ -608,7 +621,7 @@ class TestAirflowData:
 
         documents = data.to_documents()
 
-        assert len(documents) == 4
+        assert len(documents) == 6
 
         assert documents[0]["id"] == "airflow:dag:pipeline"
         assert documents[0]["type"] == "airflow_dag"
@@ -619,7 +632,35 @@ class TestAirflowData:
         assert documents[2]["id"] == "airflow:task:pipeline:load"
         assert documents[2]["type"] == "airflow_task"
 
-        dependency = documents[3]
+        containments = documents[3:5]
+        assert containments == [
+            {
+                "id": "airflow:contains:pipeline:extract",
+                "name": "pipeline contains extract",
+                "type": "airflow_contains",
+                "source": "airflow:dag:pipeline",
+                "target": "airflow:task:pipeline:extract",
+                "dag_id": "pipeline",
+                "task_id": "extract",
+                "metadata": {
+                    "airflow_source": "https://airflow.example.com/",
+                },
+            },
+            {
+                "id": "airflow:contains:pipeline:load",
+                "name": "pipeline contains load",
+                "type": "airflow_contains",
+                "source": "airflow:dag:pipeline",
+                "target": "airflow:task:pipeline:load",
+                "dag_id": "pipeline",
+                "task_id": "load",
+                "metadata": {
+                    "airflow_source": "https://airflow.example.com/",
+                },
+            },
+        ]
+
+        dependency = documents[5]
 
         assert dependency["id"] == "airflow:dependency:pipeline:extract:load"
         assert dependency["type"] == "airflow_dependency"

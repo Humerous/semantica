@@ -51,6 +51,8 @@ class AirflowData:
         """Convert Airflow metadata into GraphBuilder-friendly document dicts."""
 
         documents: List[Dict[str, Any]] = []
+        containment_documents: List[Dict[str, Any]] = []
+        exported_dag_ids = set()
 
         for dag in self.dags:
             dag_id = str(dag.get("dag_id") or "")
@@ -63,6 +65,7 @@ class AirflowData:
             doc.setdefault("type", "airflow_dag")
             doc.setdefault("source", self.source)
             documents.append(doc)
+            exported_dag_ids.add(dag_id)
 
         for task in self.tasks:
             dag_id = str(task.get("dag_id") or "")
@@ -71,12 +74,31 @@ class AirflowData:
             if not dag_id or not task_id:
                 continue
 
+            task_entity_id = f"airflow:task:{dag_id}:{task_id}"
             doc = dict(task)
-            doc.setdefault("id", f"airflow:task:{dag_id}:{task_id}")
+            doc.setdefault("id", task_entity_id)
             doc.setdefault("name", task_id)
             doc.setdefault("type", "airflow_task")
             doc.setdefault("source", self.source)
             documents.append(doc)
+
+            if dag_id in exported_dag_ids:
+                containment_documents.append(
+                    {
+                        "id": f"airflow:contains:{dag_id}:{task_id}",
+                        "name": f"{dag_id} contains {task_id}",
+                        "type": "airflow_contains",
+                        "source": f"airflow:dag:{dag_id}",
+                        "target": task_entity_id,
+                        "dag_id": dag_id,
+                        "task_id": task_id,
+                        "metadata": {
+                            "airflow_source": self.source,
+                        },
+                    }
+                )
+
+        documents.extend(containment_documents)
 
         for dependency in self.dependencies:
             dag_id = str(dependency.get("dag_id") or "")
